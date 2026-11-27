@@ -1,0 +1,66 @@
+id,generic_name,brand_names,category,rx_required
+101,paracetamol,panadol|calpol|hedex|action|mara moja,Analgesic & Fever,0
+102,ibuprofen,brufen|nurofen|ibugesic,Analgesic & Anti-inflammatory,0
+103,diclofenac,voltaren|diclomol|cataflam,Analgesic & Anti-inflammatory,1
+104,tramadol,tramal|ultram,Pain Management,1
+105,aspirin,disprin|cardiprin|ecotrin,Analgesic & Cardiac,0
+106,hyoscine butylbromide,buscopan,Stomach Cramps,0
+107,omeprazole,losec|omez|prilosec,Ulcer & Acidity,0
+108,esomeprazole,nexium|esoz,Ulcer & Acidity,1
+109,magnesium trisilicate,gaviscon|maalox|actal,Antacid,0
+110,loperamide,imodium|lomotil,Diarrhea Relief,0
+111,oral rehydration salts,ors|hydralyte|electro-ors,Rehydration,0
+112,zinc sulfate,zincol|zinco-kid,Supplement & Diarrhea,0
+113,ondansetron,zofran|emeset,Nausea & Motion Sickness,1
+114,promethazine,phenergan|avomine,Motion Sickness & Allergy,0
+115,cetirizine,piriteze|zyrtec|alerid|cetzine,Allergy & Antihistamine,0
+116,loratadine,claritin|lorfast,Allergy & Antihistamine,0
+117,chlorpheniramine,piriton,Allergy & Antihistamine,0
+118,hydrocortisone cream,cortaid|hycor,Skin & Rash,0
+119,clotrimazole,canesten|candid,Antifungal,0
+120,amoxicillin,amoxil|moxilin|amoxypen,Antibiotic,1
+121,amoxicillin-clavulanate,augmentin|clavulin|curam,Antibiotic,1
+122,azithromycin,zithromax|azee|azax,Antibiotic,1
+123,ciprofloxacin,cipro|ciprobay|cifran,Antibiotic,1
+124,doxycycline,vibramycin|doxytab,Antibiotic,1
+125,metronidazole,flagyl|metrogyl,Antibiotic & Antiprotozoal,1
+126,cefixime,suprax|taxim-o,Antibiotic,1
+127,cefuroxime,zinnat|ceftin,Antibiotic,1
+128,cotrimoxazole,septrin|bactrim,Antibiotic,1
+129,artemether-lumefantrine,coartem|lonart|combiart,Antimalarial,1
+130,zuclopenthixol,clopixol|clopixol depot|clopixol acuphase,Psychiatric & Neurology,1
+131,haloperidol,haldol|serenace,Psychiatric & Neurology,1
+132,risperidone,risperdal|risnia,Psychiatric & Neurology,1
+133,olanzapine,zyprexa|olanz,Psychiatric & Neurology,1
+134,quetiapine,seroquel|q-pin,Psychiatric & Neurology,1
+135,chlorpromazine,largactil,Psychiatric & Neurology,1
+136,fluphenazine,modecate|prolixin,Psychiatric & Neurology,1
+137,amitriptyline,tryptizol|elavil,Psychiatric & Neurology,1
+138,fluoxetine,prozac|fludac,Psychiatric & Neurology,1
+139,sertraline,zoloft|serlift,Psychiatric & Neurology,1
+140,carbamazepine,tegretol|mazetol,Epilepsy & Neurology,1
+141,sodium valproate,epilim|valparin,Epilepsy & Neurology,1
+142,phenytoin,epanutin|dilantin,Epilepsy & Neurology,1
+143,diazepam,valium|calmpose,Emergency & Seizure,1
+144,biperiden,akineton,Neurology & Side-Effect Relief,1
+145,trihexyphenidyl,artane|pacitane,Neurology & Side-Effect Relief,1
+146,metformin,glucophage|glucomet|glycomet,Diabetes,1
+147,glibenclamide,daonil|euglucon,Diabetes,1
+148,glimepiride,amaryl|glimy,Diabetes,1
+149,insulin glargine,lantus|basaglar,Diabetes,1
+150,insulin mixtard,mixtard 30|humulin,Diabetes,1
+151,amlodipine,norvasc|amlozaar|stamlo,Blood Pressure,1
+152,losartan,cozaar|losacar|repace,Blood Pressure,1
+153,nifedipine,adalat|nifecard,Blood Pressure,1
+154,atenolol,tenormin|aten,Blood Pressure,1
+155,hydrochlorothiazide,esidrex|hctz,Blood Pressure,1
+156,atorvastatin,lipitor|atorva|storvas,Cholesterol,1
+157,salbutamol inhaler,ventolin|asthalin,Asthma & Respiratory,1
+158,budesonide-formoterol,symbicort|foracort,Asthma & Respiratory,1
+159,prednisolone,prednisone|wysolone,Steroid & Inflammation,1
+160,epinephrine,epipen|adrenaline,Emergency Anaphylaxis,1
+161,levonorgestrel,postinor 2|p2|econtra,Emergency Contraceptive,0
+162,folic acid,folate|pregnavit,Maternal & Supplement,0
+163,ferrous sulfate,fefol|ranferon,Iron Supplement,0
+164,vitamin c,redoxon|ceelin,Supplement,0
+165,povidone-iodine,betadine,First Aid & Antiseptic,0

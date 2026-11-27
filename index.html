@@ -1,0 +1,139 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedRoute â€” Kenya Pharmacy Stock Finder</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 20px auto; padding: 0 16px; background: #f4f7f6; color: #222; }
+    h1 { color: #0b6e4f; font-size: 1.5rem; margin-bottom: 4px; }
+    .sub { color: #555; font-size: 0.9rem; margin-bottom: 16px; }
+    .box { background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 16px; position: relative; }
+    input { width: 100%; padding: 12px; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+    .suggestions { border: 1px solid #ddd; border-radius: 8px; max-height: 200px; overflow-y: auto; background: #fff; margin-top: 4px; }
+    .sug-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 0.92rem; }
+    .sug-item:hover { background: #e6f4ea; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .chip { background: #e6f4ea; color: #0b6e4f; padding: 6px 10px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .chip span { cursor: pointer; font-weight: bold; }
+    .rx-tag { background: #fdecea; color: #b00020; font-size: 0.72rem; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
+    button { width: 100%; padding: 12px; font-size: 1rem; font-weight: bold; background: #0b6e4f; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 6px; }
+    .card { background: #fff; padding: 14px; border-radius: 10px; margin-bottom: 12px; border-left: 5px solid #0b6e4f; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .partial { border-left-color: #e09f3e; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; background: #e6f4ea; color: #0b6e4f; }
+    .nav-btn { display: inline-block; margin-top: 8px; color: #0b6e4f; font-weight: bold; text-decoration: none; }
+  </style>
+  <link rel="manifest" href="/manifest.json" />
+</head>
+<body>
+  <h1>MedRoute Pharmacy Finder</h1>
+  <div class="sub">Search brand or generic medicines (e.g., Clopixol, Panadol, Coartem) along your route.</div>
+
+  <div class="box">
+    <input id="searchInput" type="text" placeholder="Type a medicine name to add..." oninput="showSuggestions()" />
+    <div id="suggestions" class="suggestions" style="display:none;"></div>
+    <div id="chips" class="chips"></div>
+    <button onclick="searchPharmacies()">Find Pharmacies With My List</button>
+    <p id="status" style="font-size:0.85rem; color:#555; margin-top:8px;"></p>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    let catalog = [];
+    let selectedMeds = [];
+
+    // Load medicine dictionary on startup
+    fetch("/api/catalog").then(r => r.json()).then(data => { catalog = data; });
+
+    function showSuggestions() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const sugDiv = document.getElementById("suggestions");
+      if (!q) { sugDiv.style.display = "none"; return; }
+
+      const matches = catalog.filter(m =>
+        m.generic.includes(q) || m.brands.some(b => b.includes(q))
+      ).slice(0, 8);
+
+      if (!matches.length) { sugDiv.style.display = "none"; return; }
+
+      sugDiv.innerHTML = matches.map(m => `
+        <div class="sug-item" onclick="addMedicine(${m.id})">
+          <strong>${m.generic}</strong> (${m.brands.join(", ")})
+          ${m.rx ? '<span class="rx-tag">Rx Required</span>' : ''}
+          <div style="font-size:0.78rem; color:#666;">${m.category}</div>
+        </div>
+      `).join("");
+      sugDiv.style.display = "block";
+    }
+
+    function addMedicine(id) {
+      if (!selectedMeds.some(m => m.id === id)) {
+        const med = catalog.find(m => m.id === id);
+        if (med) selectedMeds.push(med);
+        renderChips();
+      }
+      document.getElementById("searchInput").value = "";
+      document.getElementById("suggestions").style.display = "none";
+    }
+
+    function removeMedicine(id) {
+      selectedMeds = selectedMeds.filter(m => m.id !== id);
+      renderChips();
+    }
+
+    function renderChips() {
+      document.getElementById("chips").innerHTML = selectedMeds.map(m => `
+        <div class="chip">
+          ${m.generic} ${m.rx ? '<span class="rx-tag">Rx</span>' : ''}
+          <span onclick="removeMedicine(${m.id})">Ã—</span>
+        </div>
+      `).join("");
+    }
+
+    function searchPharmacies() {
+      const status = document.getElementById("status");
+      const resultsDiv = document.getElementById("results");
+      if (!selectedMeds.length) {
+        status.textContent = "Please select at least one medicine from the list above.";
+        return;
+      }
+
+      const ids = selectedMeds.map(m => m.id).join(",");
+      status.textContent = "Locating you and checking nearby pharmacy inventories...";
+      resultsDiv.innerHTML = "";
+
+      const runQuery = async (lat, lon) => {
+        const res = await fetch(`/api/search?lat=${lat}&lon=${lon}&ids=${ids}`);
+        const data = await res.json();
+        status.textContent = `Found ${data.length} matching pharmacies.`;
+
+        data.forEach(p => {
+          const isFull = p.matchPercent === 100;
+          const mapsUrl = `https://google.com{p.lat},${p.lon}`;
+          resultsDiv.innerHTML += `
+            <div class="card ${isFull ? "" : "partial"}">
+              <span class="badge">${p.matchPercent}% Match â€¢ ${p.distanceKm} km away</span>
+              <h3 style="margin:8px 0 4px;">${p.name}</h3>
+              <div style="font-size:0.9rem; color:#555;">${p.area}</div>
+              <p style="margin:8px 0 4px; font-size:0.9rem;"><strong>In Stock:</strong> ${p.available.join(", ")}</p>
+              ${p.missing.length ? `<p style="margin:0; font-size:0.9rem; color:#b00020;"><strong>Missing:</strong> ${p.missing.join(", ")}</p>` : ""}
+              <a class="nav-btn" href="${mapsUrl}" target="_blank">Navigate with Google Maps â†’</a>
+            </div>`;
+        });
+      };
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => runQuery(pos.coords.latitude, pos.coords.longitude),
+          () => runQuery(-1.2648, 36.8047) // Fallback to Westlands, Nairobi
+        );
+      } else {
+        runQuery(-1.2648, 36.8047);
+      }
+    }
+  </script>
+  <p style="text-align:center; margin-top:24px;"><a href="/admin" style="color:#0b6e4f; font-weight:bold; text-decoration:none;">Pharmacist & Branch Portal →</a></p>
+</body>
+</html>
+
