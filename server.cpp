@@ -1,4 +1,4 @@
-#include "httplib.h"
+﻿#include "httplib.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -10,6 +10,8 @@
 #include <cmath>
 #include <cctype>
 #include <mutex>
+#include <thread>
+#include <cstdlib>
 
 struct Medicine {
     int id;
@@ -26,6 +28,7 @@ struct Pharmacy {
     double lon;
     std::string pin;
     std::string ppbLicense;
+    std::string phone;
     bool approved;
     std::set<int> stockIds;
 };
@@ -44,9 +47,19 @@ std::string toLower(std::string s) {
 }
 
 std::string trim(const std::string& s) {
-    if (s.size() >= 3 && (unsigned char)s[0]==0xEF && (unsigned char)s[1]==0xBB && (unsigned char)s[2]==0xBF) return trim(s.substr(3)); size_t start = s.find_first_not_of(" \t\r\n");
+    if (s.size() >= 3 && (unsigned char)s[0] == 0xEF && (unsigned char)s[1] == 0xBB && (unsigned char)s[2] == 0xBF)
+        return trim(s.substr(3));
+    size_t start = s.find_first_not_of(" \t\r\n");
     size_t end = s.find_last_not_of(" \t\r\n");
     return (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+}
+
+std::string sanitizePhone(std::string raw) {
+    std::string digits;
+    for (char c : raw) if (std::isdigit(static_cast<unsigned char>(c))) digits += c;
+    if (digits.size() == 10 && digits[0] == '0') digits = "254" + digits.substr(1);
+    else if (digits.size() == 9 && (digits[0] == '7' || digits[0] == '1')) digits = "254" + digits;
+    return digits;
 }
 
 std::string jsonEscape(const std::string& s) {
@@ -57,6 +70,27 @@ std::string jsonEscape(const std::string& s) {
         else out += c;
     }
     return out;
+}
+
+void syncFileToGitHub(const std::string& filename) {
+    const char* tokenEnv = std::getenv("GITHUB_TOKEN");
+    const char* repoEnv = std::getenv("GITHUB_REPO");
+    if (!tokenEnv || !repoEnv) return;
+    std::string token(tokenEnv), repo(repoEnv);
+    if (token.empty() || repo.empty()) return;
+
+    std::thread([filename, token, repo]() {
+        std::string cmd =
+            "SHA=$(curl -s -H \"Authorization: Bearer " + token + "\" "
+            "\"https://github.com" + repo + "/contents/" + filename + "\" | "
+            "grep -m1 '\"sha\"' | cut -d'\"' -f4); "
+            "B64=$(base64 -w 0 " + filename + "); "
+            "curl -s -X PUT -H \"Authorization: Bearer " + token + "\" "
+            "-H \"Content-Type: application/json\" "
+            "-d \"{\\\"message\\\":\\\"Auto-sync " + filename + "\\\",\\\"content\\\":\\\"$B64\\\",\\\"sha\\\":\\\"$SHA\\\"}\" "
+            "\"https://github.com" + repo + "/contents/" + filename + "\" > /dev/null 2>&1";
+        std::system(cmd.c_str());
+    }).detach();
 }
 
 double haversineKm(double lat1, double lon1, double lat2, double lon2) {
@@ -92,7 +126,8 @@ int loadCatalog(const std::string& filename,
         std::getline(ss, category, ',');
         std::getline(ss, rxStr, ',');
 
-        int id = 0; try { id = std::stoi(trim(idStr)); } catch (...) { continue; }
+        int id = 0;
+        try { id = std::stoi(trim(idStr)); } catch (...) { continue; }
         if (id > maxId) maxId = id;
         std::string cleanGeneric = toLower(trim(generic));
         bool rx = (trim(rxStr) == "1");
@@ -123,7 +158,7 @@ std::vector<Pharmacy> loadPharmacies(const std::string& filename) {
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         std::stringstream ss(line);
-        std::string name, area, latStr, lonStr, pinStr, ppbStr, appStr, stockStr;
+        std::string name, area, latStr, lonStr, pinStr, ppbStr, phoneStr, appStr, stockStr;
 
         std::getline(ss, name, ',');
         std::getline(ss, area, ',');
@@ -131,38 +166,43 @@ std::vector<Pharmacy> loadPharmacies(const std::string& filename) {
         std::getline(ss, lonStr, ',');
         std::getline(ss, pinStr, ',');
         std::getline(ss, ppbStr, ',');
+        std::getline(ss, phoneStr, ',');
         std::getline(ss, appStr, ',');
         std::getline(ss, stockStr, ',');
 
-        try { Pharmacy p{
-            trim(name), trim(area),
-            std::stod(latStr), std::stod(lonStr),
-            trim(pinStr), trim(ppbStr),
-            trim(appStr) == "1", {}
-        };
-        std::stringstream stockStream(stockStr);
-        std::string idToken;
-        while (std::getline(stockStream, idToken, '|')) {
-            std::string cleanId = trim(idToken);
-            if (!cleanId.empty()) p.stockIds.insert(std::stoi(cleanId));
-        }
-        list.push_back(p); } catch (...) { continue; }
+        try {
+            Pharmacy p{
+                trim(name), trim(area),
+                std::stod(latStr), std::stod(lonStr),
+                trim(pinStr), trim(ppbStr), sanitizePhone(phoneStr),
+                trim(appStr) == "1", {}
+            };
+            std::stringstream stockStream(stockStr);
+            std::string idToken;
+            while (std::getline(stockStream, idToken, '|')) {
+                std::string cleanId = trim(idToken);
+                if (!cleanId.empty()) p.stockIds.insert(std::stoi(cleanId));
+            }
+            list.push_back(p);
+        } catch (...) { continue; }
     }
     return list;
 }
 
 void savePharmacies(const std::string& filename, const std::vector<Pharmacy>& pharmacies) {
     std::ofstream out(filename);
-    out << "name,area,lat,lon,pin,ppb_license,approved,stock_ids\n";
+    out << "name,area,lat,lon,pin,ppb_license,phone,approved,stock_ids\n";
     for (const auto& p : pharmacies) {
         out << p.name << "," << p.area << "," << p.lat << "," << p.lon << ","
-            << p.pin << "," << p.ppbLicense << "," << (p.approved ? "1" : "0") << ",";
+            << p.pin << "," << p.ppbLicense << "," << p.phone << "," << (p.approved ? "1" : "0") << ",";
         size_t count = 0;
         for (int id : p.stockIds) {
             out << id << (++count < p.stockIds.size() ? "|" : "");
         }
         out << "\n";
     }
+    out.close();
+    syncFileToGitHub(filename);
 }
 
 int main() {
@@ -177,6 +217,7 @@ int main() {
     std::cout << "Loaded " << idToMed.size() << " medicines and " << pharmacies.size() << " pharmacies.\n";
 
     httplib::Server svr;
+    svr.set_mount_point("/", "./");
 
     svr.Get("/", [](const httplib::Request&, httplib::Response& res) {
         std::ifstream html("index.html");
@@ -184,14 +225,6 @@ int main() {
         buffer << html.rdbuf();
         res.set_content(buffer.str(), "text/html");
     });
-
-    svr.Get("/manifest.json", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("manifest.json"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "application/json"); });
-
-    svr.Get("/icon.svg", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("icon.svg"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "image/svg+xml"); });
-
-    svr.Get("/sw.js", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("sw.js"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "application/javascript"); });
-
-    svr.set_mount_point("/", "./");
 
     svr.Get("/admin", [](const httplib::Request&, httplib::Response& res) {
         std::ifstream html("admin.html");
@@ -233,6 +266,7 @@ int main() {
                  << ",\"lat\":" << p.lat
                  << ",\"lon\":" << p.lon
                  << ",\"ppb\":\"" << jsonEscape(p.ppbLicense) << "\""
+                 << ",\"phone\":\"" << jsonEscape(p.phone) << "\""
                  << ",\"approved\":" << (p.approved ? "true" : "false")
                  << ",\"stockIds\":[";
             size_t c = 0;
@@ -244,11 +278,11 @@ int main() {
         res.set_content(json.str(), "application/json");
     });
 
-    // Self-register a new pharmacy branch (starts as Pending until Master Admin approves)
     svr.Post("/api/register_pharmacy", [&](const httplib::Request& req, httplib::Response& res) {
         std::string name = req.has_param("name") ? trim(req.get_param_value("name")) : "";
         std::string area = req.has_param("area") ? trim(req.get_param_value("area")) : "";
         std::string ppb = req.has_param("ppb") ? trim(req.get_param_value("ppb")) : "";
+        std::string phone = req.has_param("phone") ? sanitizePhone(req.get_param_value("phone")) : "";
         std::string latStr = req.has_param("lat") ? trim(req.get_param_value("lat")) : "";
         std::string lonStr = req.has_param("lon") ? trim(req.get_param_value("lon")) : "";
         std::string pin = req.has_param("pin") ? trim(req.get_param_value("pin")) : "";
@@ -257,9 +291,9 @@ int main() {
         std::replace(area.begin(), area.end(), ',', '-');
         std::replace(ppb.begin(), ppb.end(), ',', '-');
 
-        if (name.empty() || area.empty() || ppb.empty() || latStr.empty() || lonStr.empty() || pin.length() < 4) {
+        if (name.empty() || area.empty() || ppb.empty() || phone.empty() || latStr.empty() || lonStr.empty() || pin.length() < 4) {
             res.status = 400;
-            res.set_content("{\"ok\":false,\"msg\":\"Fill all fields (PIN must be at least 4 digits).\"}", "application/json");
+            res.set_content("{\"ok\":false,\"msg\":\"Fill all fields including phone number and 4-digit PIN.\"}", "application/json");
             return;
         }
 
@@ -267,7 +301,7 @@ int main() {
             double lat = std::stod(latStr);
             double lon = std::stod(lonStr);
             std::lock_guard<std::mutex> lock(dataMutex);
-            pharmacies.push_back(Pharmacy{name, area, lat, lon, pin, ppb, false, {101, 102, 111}});
+            pharmacies.push_back(Pharmacy{name, area, lat, lon, pin, ppb, phone, false, {101, 102, 111}});
             savePharmacies("pharmacies.csv", pharmacies);
             res.set_content("{\"ok\":true,\"msg\":\"Submitted! Your branch is Pending verification before going live.\"}", "application/json");
         } catch (...) {
@@ -276,7 +310,6 @@ int main() {
         }
     });
 
-    // Approve or delete a pending branch using Master Key
     svr.Post("/api/verify_pharmacy", [&](const httplib::Request& req, httplib::Response& res) {
         std::string master = req.has_param("master") ? trim(req.get_param_value("master")) : "";
         if (master != MASTER_KEY) {
@@ -296,11 +329,34 @@ int main() {
         if (action == "approve") {
             pharmacies[idx].approved = true;
             savePharmacies("pharmacies.csv", pharmacies);
-            res.set_content("{\"ok\":true,\"msg\":\"Branch approved and now live on map searches!\"}", "application/json");
+            res.set_content("{\"ok\":true,\"msg\":\"Branch approved and synced permanently!\"}", "application/json");
         } else {
             pharmacies.erase(pharmacies.begin() + idx);
             savePharmacies("pharmacies.csv", pharmacies);
             res.set_content("{\"ok\":true,\"msg\":\"Branch removed.\"}", "application/json");
+        }
+    });
+
+    svr.Post("/api/update_location", [&](const httplib::Request& req, httplib::Response& res) {
+        size_t idx = std::stoul(req.get_param_value("index"));
+        std::string pin = trim(req.get_param_value("pin"));
+        std::string latStr = trim(req.get_param_value("lat"));
+        std::string lonStr = trim(req.get_param_value("lon"));
+
+        std::lock_guard<std::mutex> lock(dataMutex);
+        if (idx >= pharmacies.size() || (pharmacies[idx].pin != pin && pin != MASTER_KEY)) {
+            res.status = 403;
+            res.set_content("{\"ok\":false,\"msg\":\"Invalid Branch PIN or Master Code.\"}", "application/json");
+            return;
+        }
+        try {
+            pharmacies[idx].lat = std::stod(latStr);
+            pharmacies[idx].lon = std::stod(lonStr);
+            savePharmacies("pharmacies.csv", pharmacies);
+            res.set_content("{\"ok\":true,\"msg\":\"Branch map pin updated and synced permanently!\"}", "application/json");
+        } catch (...) {
+            res.status = 400;
+            res.set_content("{\"ok\":false,\"msg\":\"Invalid GPS coordinates.\"}", "application/json");
         }
     });
 
@@ -350,37 +406,17 @@ int main() {
         for (size_t i = 0; i < cleanBrands.size(); ++i)
             catOut << cleanBrands[i] << (i + 1 < cleanBrands.size() ? "|" : "");
         catOut << "," << category << "," << (rx ? "1" : "0") << "\n";
+        catOut.close();
+        syncFileToGitHub("medicines_catalog.csv");
 
         pharmacies[idx].stockIds.insert(newId);
         savePharmacies("pharmacies.csv", pharmacies);
-        res.set_content("{\"ok\":true,\"msg\":\"Added new medicine and ticked in your stock!\"}", "application/json");
-    });
-
-    svr.Post("/api/update_location", [&](const httplib::Request& req, httplib::Response& res) {
-        size_t idx = std::stoul(req.get_param_value("index"));
-        std::string pin = trim(req.get_param_value("pin"));
-        std::string latStr = trim(req.get_param_value("lat"));
-        std::string lonStr = trim(req.get_param_value("lon"));
-
-        std::lock_guard<std::mutex> lock(dataMutex);
-        if (idx >= pharmacies.size() || (pharmacies[idx].pin != pin && pin != MASTER_KEY)) {
-            res.status = 403;
-            res.set_content("{\"ok\":false,\"msg\":\"Invalid Branch PIN or Master Code.\"}", "application/json");
-            return;
-        }
-        try {
-            pharmacies[idx].lat = std::stod(latStr);
-            pharmacies[idx].lon = std::stod(lonStr);
-            savePharmacies("pharmacies.csv", pharmacies);
-            res.set_content("{\"ok\":true,\"msg\":\"Branch map pin updated and saved!\"}", "application/json");
-        } catch (...) {
-            res.status = 400;
-            res.set_content("{\"ok\":false,\"msg\":\"Invalid GPS coordinates.\"}", "application/json");
-        }
+        res.set_content("{\"ok\":true,\"msg\":\"Added new medicine and synced permanently!\"}", "application/json");
     });
 
     svr.Post("/api/update_stock", [&](const httplib::Request& req, httplib::Response& res) {
         size_t idx = std::stoul(req.get_param_value("index"));
+
         std::string pin = trim(req.get_param_value("pin"));
         std::string idsParam = req.has_param("ids") ? req.get_param_value("ids") : "";
 
@@ -401,14 +437,12 @@ int main() {
 
         pharmacies[idx].stockIds = updatedStock;
         savePharmacies("pharmacies.csv", pharmacies);
-        res.set_content("{\"ok\":true,\"msg\":\"Inventory updated and saved!\"}", "application/json");
+        res.set_content("{\"ok\":true,\"msg\":\"Inventory updated and synced permanently!\"}", "application/json");
     });
 
-    // Only approved pharmacies appear in traveler search results
     svr.Get("/api/search", [&](const httplib::Request& req, httplib::Response& res) {
         double userLat = req.has_param("lat") ? std::stod(req.get_param_value("lat")) : -1.2648;
         double userLon = req.has_param("lon") ? std::stod(req.get_param_value("lon")) : 36.8047;
-
         std::string idsParam = req.has_param("ids") ? req.get_param_value("ids") : "";
 
         std::set<int> userNeeds;
@@ -461,6 +495,7 @@ int main() {
             json << "{"
                  << "\"name\":\"" << jsonEscape(r.pharmacy.name) << "\","
                  << "\"area\":\"" << jsonEscape(r.pharmacy.area) << "\","
+                 << "\"phone\":\"" << jsonEscape(r.pharmacy.phone) << "\","
                  << "\"lat\":" << r.pharmacy.lat << ","
                  << "\"lon\":" << r.pharmacy.lon << ","
                  << "\"distanceKm\":" << std::round(r.distanceKm * 10.0) / 10.0 << ","
@@ -485,7 +520,4 @@ int main() {
     svr.listen("0.0.0.0", port);
     return 0;
 }
-
-
-
 

@@ -127,7 +127,11 @@
               <div style="font-size:0.9rem; color:#555;">${p.area}</div>
               <p style="margin:8px 0 4px; font-size:0.9rem;"><strong>In Stock:</strong> ${p.available.join(", ")}</p>
               ${p.missing.length ? `<p style="margin:0; font-size:0.9rem; color:#b00020;"><strong>Missing:</strong> ${p.missing.join(", ")}</p>` : ""}
-              <a class="nav-btn" href="${mapsUrl}" rel="noopener">Navigate with Google Maps →</a>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:10px;">
+                <a class="nav-btn" style="margin-top:0;" href="${mapsUrl}">📍 Maps</a>
+                ${p.phone ? `<a class="nav-btn" style="margin-top:0; color:#1b4965;" href="tel:+${p.phone}">📞 Call</a>` : ""}
+                ${p.phone ? `<a class="nav-btn" style="margin-top:0; color:#128c7e;" href="https://wa.me{p.phone}?text=${encodeURIComponent("Hello " + p.name + ", I found you on MedRoute. Please confirm if you have: " + p.available.join(", "))}">💬 WhatsApp</a>` : ""}
+              </div>
             </div>`;
         });
       };
