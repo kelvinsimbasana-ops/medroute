@@ -1,4 +1,4 @@
-﻿#include "httplib.h"
+#include "httplib.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -188,6 +188,8 @@ int main() {
     svr.Get("/manifest.json", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("manifest.json"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "application/json"); });
 
     svr.Get("/icon.svg", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("icon.svg"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "image/svg+xml"); });
+
+    svr.Get("/sw.js", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("sw.js"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "application/javascript"); });
 
     svr.Get("/admin", [](const httplib::Request&, httplib::Response& res) {
         std::ifstream html("admin.html");
