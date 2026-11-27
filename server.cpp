@@ -191,6 +191,8 @@ int main() {
 
     svr.Get("/sw.js", [](const httplib::Request&, httplib::Response& res) { std::ifstream f("sw.js"); std::stringstream b; b << f.rdbuf(); res.set_content(b.str(), "application/javascript"); });
 
+    svr.set_mount_point("/", "./");
+
     svr.Get("/admin", [](const httplib::Request&, httplib::Response& res) {
         std::ifstream html("admin.html");
         std::stringstream buffer;
