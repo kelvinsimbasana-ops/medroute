@@ -1,19 +1,22 @@
 {
   "name": "MedRoute Kenya Pharmacy Finder",
   "short_name": "MedRoute",
-  "description": "Find nearby pharmacies with your exact medicines in stock along your route.",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#f4f7f6",
   "theme_color": "#0b6e4f",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
