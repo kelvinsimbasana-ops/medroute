@@ -1,4 +1,4 @@
-const CACHE_NAME = "medroute-v4";
+const CACHE_NAME = "medroute-v5";
 const ASSETS = ["/", "/admin", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", event => {

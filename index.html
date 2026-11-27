@@ -110,7 +110,7 @@
 
         data.forEach(p => {
           const isFull = p.matchPercent === 100;
-          const mapsUrl = `geo:${p.lat},${p.lon}?q=${p.lat},${p.lon}(${encodeURIComponent(p.name)})`;
+          const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent); const placeQuery = encodeURIComponent(`${p.name}, ${p.area}`); const mapsUrl = isMobile ? `geo:${p.lat},${p.lon}?q=${p.lat},${p.lon}(${placeQuery})` : `https://google.com{placeQuery}&center=${p.lat},${p.lon}`;
           resultsDiv.innerHTML += `
             <div class="card ${isFull ? "" : "partial"}">
               <span class="badge">${p.matchPercent}% Match â€¢ ${p.distanceKm} km away</span>
