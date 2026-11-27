@@ -356,6 +356,29 @@ int main() {
         res.set_content("{\"ok\":true,\"msg\":\"Added new medicine and ticked in your stock!\"}", "application/json");
     });
 
+    svr.Post("/api/update_location", [&](const httplib::Request& req, httplib::Response& res) {
+        size_t idx = std::stoul(req.get_param_value("index"));
+        std::string pin = trim(req.get_param_value("pin"));
+        std::string latStr = trim(req.get_param_value("lat"));
+        std::string lonStr = trim(req.get_param_value("lon"));
+
+        std::lock_guard<std::mutex> lock(dataMutex);
+        if (idx >= pharmacies.size() || (pharmacies[idx].pin != pin && pin != MASTER_KEY)) {
+            res.status = 403;
+            res.set_content("{\"ok\":false,\"msg\":\"Invalid Branch PIN or Master Code.\"}", "application/json");
+            return;
+        }
+        try {
+            pharmacies[idx].lat = std::stod(latStr);
+            pharmacies[idx].lon = std::stod(lonStr);
+            savePharmacies("pharmacies.csv", pharmacies);
+            res.set_content("{\"ok\":true,\"msg\":\"Branch map pin updated and saved!\"}", "application/json");
+        } catch (...) {
+            res.status = 400;
+            res.set_content("{\"ok\":false,\"msg\":\"Invalid GPS coordinates.\"}", "application/json");
+        }
+    });
+
     svr.Post("/api/update_stock", [&](const httplib::Request& req, httplib::Response& res) {
         size_t idx = std::stoul(req.get_param_value("index"));
         std::string pin = trim(req.get_param_value("pin"));

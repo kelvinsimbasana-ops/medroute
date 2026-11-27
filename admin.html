@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MedRoute — Pharmacist & Branch Portal</title>
+  <link rel="stylesheet" href="https://unpkg.com" />
+  <script src="https://unpkg.com"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 680px; margin: 20px auto; padding: 0 16px; background: #f4f7f6; color: #222; }
     h1 { color: #0b6e4f; font-size: 1.45rem; margin-bottom: 4px; }
@@ -11,14 +13,15 @@
     select, input[type="password"], input[type="text"] { width: 100%; padding: 11px; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; margin-bottom: 10px; }
     .row-2 { display: flex; gap: 8px; }
     .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-    .btn-sm { flex: 1; padding: 8px 10px; font-size: 0.85rem; font-weight: 600; background: #e6f4ea; color: #0b6e4f; border: 1px solid #b7dfca; border-radius: 6px; cursor: pointer; }
+    .btn-sm { flex: 1; padding: 9px 10px; font-size: 0.85rem; font-weight: 600; background: #e6f4ea; color: #0b6e4f; border: 1px solid #b7dfca; border-radius: 6px; cursor: pointer; }
     .btn-sm.clear { background: #fdecea; color: #b00020; border-color: #f5c2c7; }
-    .med-list { max-height: 320px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px; }
+    .med-list { max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px; }
     .med-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #f2f2f2; }
     .med-row label { flex: 1; cursor: pointer; font-size: 0.92rem; }
     .cat { font-size: 0.78rem; color: #666; }
     .btn-main { width: 100%; padding: 12px; font-size: 1rem; font-weight: bold; background: #0b6e4f; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
     .msg { margin-top: 10px; font-weight: bold; font-size: 0.92rem; }
+    #mapPicker { height: 260px; width: 100%; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 10px; }
     .pending-card { border: 1px solid #f0c36d; background: #fffdf5; padding: 10px; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; }
     .back { display: inline-block; margin-top: 12px; color: #0b6e4f; text-decoration: none; font-weight: bold; }
   </style>
@@ -30,7 +33,7 @@
   <div class="box">
     <h3 style="margin-top:0; color:#0b6e4f;">1. Update Branch Stock</h3>
     <select id="pharmacySelect" onchange="loadBranchStock()"></select>
-    <input id="pinInput" type="password" placeholder="Enter your branch PIN" />
+    <input id="pinInput" type="password" placeholder="Enter Branch PIN (or Master Admin Code)" />
     <input id="filterInput" type="text" placeholder="Filter by medicine, brand, or category..." oninput="renderChecklist()" />
 
     <div class="toolbar">
@@ -44,9 +47,39 @@
     <div id="statusMsg" class="msg"></div>
   </div>
 
-  <!-- 2. Add Missing Medicine / Category -->
+  <!-- 2. Interactive Map Pin & GPS Location Tool -->
   <div class="box">
-    <h3 style="margin-top:0; color:#1b4965;">2. Add Missing Medicine or Category</h3>
+    <h3 style="margin-top:0; color:#2b5876;">2. Tag Exact Pharmacy Location (Search Map or GPS)</h3>
+    <div class="row-2">
+      <input id="mapSearchInput" type="text" placeholder="Search place (e.g. Sarit Centre Westlands)..." />
+      <button type="button" class="btn-sm" style="flex:0 0 90px; height:43px;" onclick="searchMapPlace()">Search</button>
+    </div>
+    <button type="button" class="btn-sm" style="width:100%; margin-bottom:10px;" onclick="captureGps()">📍 Use My Current GPS Location</button>
+    <div id="mapPicker"></div>
+    <div style="font-size:0.82rem; color:#555; margin-bottom:8px;">Tip: Tap anywhere on the map or drag the blue pin to the exact pharmacy entrance.</div>
+    <div class="row-2">
+      <input id="pickedLat" type="text" placeholder="Latitude" />
+      <input id="pickedLon" type="text" placeholder="Longitude" />
+    </div>
+    <button type="button" class="btn-main" style="background:#2b5876;" onclick="updateExistingBranchPin()">Update Pin for Selected Branch (#1 Above)</button>
+    <div id="pinMsg" class="msg"></div>
+  </div>
+
+  <!-- 3. Register New Pharmacy Branch (Uses Pin Tagged Above) -->
+  <div class="box">
+    <h3 style="margin-top:0; color:#3a5a40;">3. Register a New Pharmacy Branch</h3>
+    <p style="font-size:0.85rem; color:#555; margin-top:0;">Tag the pharmacy's exact spot on the map in Section #2 above, then fill details below:</p>
+    <input id="regName" type="text" placeholder="Pharmacy Name (e.g. Goodlife Sarit Centre)" />
+    <input id="regArea" type="text" placeholder="Area / Highway (e.g. Westlands - Karuna Rd)" />
+    <input id="regPpb" type="text" placeholder="PPB License Number (e.g. PPB/C/1234)" />
+    <input id="regPin" type="password" placeholder="Create a 4-digit Branch PIN" />
+    <button class="btn-main" style="background:#3a5a40;" onclick="registerPharmacy()">Submit Branch for Verification</button>
+    <div id="regMsg" class="msg"></div>
+  </div>
+
+  <!-- 4. Add Missing Medicine / Category -->
+  <div class="box">
+    <h3 style="margin-top:0; color:#1b4965;">4. Add Missing Medicine or Category</h3>
     <input id="newGeneric" type="text" placeholder="Generic name (e.g. timolol eye drops)" />
     <input id="newBrands" type="text" placeholder="Brand names separated by | (e.g. timoptol|nyolol)" />
     <input id="newCategory" list="categorySuggestions" type="text" placeholder="Category (pick existing or type a new one)" />
@@ -58,25 +91,9 @@
     <div id="addMsg" class="msg"></div>
   </div>
 
-  <!-- 3. Register New Pharmacy Branch -->
-  <div class="box">
-    <h3 style="margin-top:0; color:#3a5a40;">3. Register a New Pharmacy Branch</h3>
-    <input id="regName" type="text" placeholder="Pharmacy Name (e.g. Sarit Centre Chemist)" />
-    <input id="regArea" type="text" placeholder="Area / Highway (e.g. Westlands - Karuna Rd)" />
-    <input id="regPpb" type="text" placeholder="PPB License Number (e.g. PPB/C/1234)" />
-    <div class="row-2">
-      <input id="regLat" type="text" placeholder="Latitude (e.g. -1.2612)" />
-      <input id="regLon" type="text" placeholder="Longitude (e.g. 36.8018)" />
-    </div>
-    <button type="button" class="btn-sm" style="width:100%; margin-bottom:10px;" onclick="captureGps()">📍 Use My Current GPS Location</button>
-    <input id="regPin" type="password" placeholder="Create a 4-digit Branch PIN" />
-    <button class="btn-main" style="background:#3a5a40;" onclick="registerPharmacy()">Submit Branch for Verification</button>
-    <div id="regMsg" class="msg"></div>
-  </div>
-
-  <!-- 4. Master Admin Approval Queue -->
+  <!-- 5. Master Admin Approval Queue -->
   <div class="box" id="approvalBox" style="display:none;">
-    <h3 style="margin-top:0; color:#b00020;">4. Pending Branch Approvals (Master Admin)</h3>
+    <h3 style="margin-top:0; color:#b00020;">5. Pending Branch Approvals (Master Admin)</h3>
     <input id="masterKeyInput" type="password" placeholder="Enter Master Admin Code (MEDROUTE2026)" />
     <div id="pendingList"></div>
     <div id="verifyMsg" class="msg"></div>
@@ -89,97 +106,82 @@
     let pharmacies = [];
     let currentStockSet = new Set();
     let showOnlyChecked = false;
+    let map, marker;
 
-    async function init() {
-      const [catRes, pharmRes] = await Promise.all([fetch("/api/catalog"), fetch("/api/pharmacies")]);
-      catalog = (await catRes.json()).sort((a, b) => a.generic.localeCompare(b.generic));
-      pharmacies = await pharmRes.json();
+    function initMap() {
+      map = L.map("mapPicker").setView([-1.2648, 36.8047], 14);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap"
+      }).addTo(map);
 
-      const cats = [...new Set(catalog.map(m => m.category))].sort();
-      document.getElementById("categorySuggestions").innerHTML = cats.map(c => `<option value="${c}">`).join("");
+      marker = L.marker([-1.2648, 36.8047], { draggable: true }).addTo(map);
+      setPickedCoords(-1.2648, 36.8047);
 
-      const sel = document.getElementById("pharmacySelect");
-      sel.innerHTML = pharmacies.map(p =>
-        `<option value="${p.index}">${p.name} — ${p.area} ${p.approved ? "" : "[PENDING]"}</option>`
-      ).join("");
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        setPickedCoords(pos.lat, pos.lng);
+      });
 
-      renderPendingQueue();
-      loadBranchStock();
+      map.on("click", e => {
+        marker.setLatLng(e.latlng);
+        setPickedCoords(e.latlng.lat, e.latlng.lng);
+      });
     }
 
-    function renderPendingQueue() {
-      const pending = pharmacies.filter(p => !p.approved);
-      const box = document.getElementById("approvalBox");
-      if (!pending.length) { box.style.display = "none"; return; }
-      box.style.display = "block";
-      document.getElementById("pendingList").innerHTML = pending.map(p => `
-        <div class="pending-card">
-          <strong>${p.name}</strong> (${p.area})<br/>
-          PPB: <strong>${p.ppb}</strong> • GPS: ${p.lat}, ${p.lon}
-          (<a href="https://google.com{p.lat},${p.lon}" target="_blank">Verify Pin on Map</a>)
-          <div class="toolbar" style="margin-top:8px; margin-bottom:0;">
-            <button type="button" class="btn-sm" onclick="verifyBranch(${p.index}, 'approve')">Approve Branch</button>
-            <button type="button" class="btn-sm clear" onclick="verifyBranch(${p.index}, 'reject')">Reject / Delete</button>
-          </div>
-        </div>
-      `).join("");
+    function setPickedCoords(lat, lon) {
+      document.getElementById("pickedLat").value = parseFloat(lat).toFixed(6);
+      document.getElementById("pickedLon").value = parseFloat(lon).toFixed(6);
     }
 
-    async function verifyBranch(index, action) {
-      const master = document.getElementById("masterKeyInput").value.trim();
-      const verifyMsg = document.getElementById("verifyMsg");
-      if (!master) { verifyMsg.style.color = "#b00020"; verifyMsg.textContent = "Enter Master Admin Code first."; return; }
-      const res = await fetch("/api/verify_pharmacy", { method: "POST", body: new URLSearchParams({ master, index, action }) });
-      const data = await res.json();
-      verifyMsg.style.color = data.ok ? "#0b6e4f" : "#b00020";
-      verifyMsg.textContent = data.msg;
-      if (data.ok) await init();
+    function movePin(lat, lon, zoom = 17) {
+      marker.setLatLng([lat, lon]);
+      map.setView([lat, lon], zoom);
+      setPickedCoords(lat, lon);
+    }
+
+    async function searchMapPlace() {
+      const q = document.getElementById("mapSearchInput").value.trim();
+      const pinMsg = document.getElementById("pinMsg");
+      if (!q) return;
+      pinMsg.style.color = "#555";
+      pinMsg.textContent = "Searching map...";
+      const res = await fetch(`https://openstreetmap.org{encodeURIComponent(q)}`);
+      const places = await res.json();
+      if (!places.length) {
+        pinMsg.style.color = "#b00020";
+        pinMsg.textContent = "Place not found. Try a nearby landmark or street name, then drag the pin.";
+        return;
+      }
+      movePin(places[0].lat, places[0].lon, 17);
+      pinMsg.style.color = "#0b6e4f";
+      pinMsg.textContent = `Found: ${places[0].display_name.split(",").slice(0, 3).join(",")}. Drag pin if needed!`;
     }
 
     function captureGps() {
-      const regMsg = document.getElementById("regMsg");
-      if (!navigator.geolocation) { regMsg.textContent = "GPS not supported on this browser."; return; }
-      regMsg.style.color = "#555";
-      regMsg.textContent = "Capturing GPS location...";
+      const pinMsg = document.getElementById("pinMsg");
+      if (!navigator.geolocation) { pinMsg.textContent = "GPS not supported."; return; }
+      pinMsg.style.color = "#555";
+      pinMsg.textContent = "Capturing exact GPS location...";
       navigator.geolocation.getCurrentPosition(
         pos => {
-          document.getElementById("regLat").value = pos.coords.latitude.toFixed(6);
-          document.getElementById("regLon").value = pos.coords.longitude.toFixed(6);
-          regMsg.style.color = "#0b6e4f";
-          regMsg.textContent = "Exact GPS coordinates captured!";
+          movePin(pos.coords.latitude, pos.coords.longitude, 18);
+          pinMsg.style.color = "#0b6e4f";
+          pinMsg.textContent = "Exact GPS location tagged on map!";
         },
-        () => { regMsg.style.color = "#b00020"; regMsg.textContent = "Location permission denied."; }
+        () => { pinMsg.style.color = "#b00020"; pinMsg.textContent = "Location permission denied."; },
+        { enableHighAccuracy: true }
       );
     }
 
-    async function registerPharmacy() {
-      const body = new URLSearchParams({
-        name: document.getElementById("regName").value.trim(),
-        area: document.getElementById("regArea").value.trim(),
-        ppb: document.getElementById("regPpb").value.trim(),
-        lat: document.getElementById("regLat").value.trim(),
-        lon: document.getElementById("regLon").value.trim(),
-        pin: document.getElementById("regPin").value.trim()
-      });
-      const res = await fetch("/api/register_pharmacy", { method: "POST", body });
-      const data = await res.json();
-      const regMsg = document.getElementById("regMsg");
-      regMsg.style.color = data.ok ? "#0b6e4f" : "#b00020";
-      regMsg.textContent = data.msg;
-      if (data.ok) {
-        ["regName", "regArea", "regPpb", "regLat", "regLon", "regPin"].forEach(id => document.getElementById(id).value = "");
-        await init();
+    async function updateExistingBranchPin() {
+      const idx = document.getElementById("pharmacySelect").value;
+      const pin = document.getElementById("pinInput").value.trim();
+      const lat = document.getElementById("pickedLat").value.trim();
+      const lon = document.getElementById("pickedLon").value.trim();
+      const pinMsg = document.getElementById("pinMsg");
+      if (!pin || !lat || !lon) {
+        pinMsg.style.color = "#b00020";
+        pinMsg.textContent = "Enter your Branch PIN (or Master Code) in Section #1 and tag a spot on the map.";
+        return;
       }
-    }
-
-    function loadBranchStock() {
-      const idx = parseInt(document.getElementById("pharmacySelect").value, 10);
-      const branch = pharmacies.find(p => p.index === idx);
-      currentStockSet = new Set(branch ? branch.stockIds : []);
-      renderChecklist();
-    }
-
-    function getVisibleMedicines() {
-      const q = document.getElementById("filterInput").value.trim().toLowerCase();
-      return catalog.filter(m => {
 
