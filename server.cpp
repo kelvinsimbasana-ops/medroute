@@ -44,7 +44,7 @@ std::string toLower(std::string s) {
 }
 
 std::string trim(const std::string& s) {
-    size_t start = s.find_first_not_of(" \t\r\n");
+    if (s.size() >= 3 && (unsigned char)s[0]==0xEF && (unsigned char)s[1]==0xBB && (unsigned char)s[2]==0xBF) return trim(s.substr(3)); size_t start = s.find_first_not_of(" \t\r\n");
     size_t end = s.find_last_not_of(" \t\r\n");
     return (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
 }
@@ -92,7 +92,7 @@ int loadCatalog(const std::string& filename,
         std::getline(ss, category, ',');
         std::getline(ss, rxStr, ',');
 
-        int id = std::stoi(trim(idStr));
+        int id = 0; try { id = std::stoi(trim(idStr)); } catch (...) { continue; }
         if (id > maxId) maxId = id;
         std::string cleanGeneric = toLower(trim(generic));
         bool rx = (trim(rxStr) == "1");
@@ -134,7 +134,7 @@ std::vector<Pharmacy> loadPharmacies(const std::string& filename) {
         std::getline(ss, appStr, ',');
         std::getline(ss, stockStr, ',');
 
-        Pharmacy p{
+        try { Pharmacy p{
             trim(name), trim(area),
             std::stod(latStr), std::stod(lonStr),
             trim(pinStr), trim(ppbStr),
@@ -146,7 +146,7 @@ std::vector<Pharmacy> loadPharmacies(const std::string& filename) {
             std::string cleanId = trim(idToken);
             if (!cleanId.empty()) p.stockIds.insert(std::stoi(cleanId));
         }
-        list.push_back(p);
+        list.push_back(p); } catch (...) { continue; }
     }
     return list;
 }
@@ -458,6 +458,7 @@ int main() {
     svr.listen("0.0.0.0", port);
     return 0;
 }
+
 
 
 
