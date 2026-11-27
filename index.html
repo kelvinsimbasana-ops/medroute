@@ -110,7 +110,7 @@
 
         data.forEach(p => {
           const isFull = p.matchPercent === 100;
-          const mapsUrl = `https://google.com{p.lat},${p.lon}`;
+          const mapsUrl = `geo:${p.lat},${p.lon}?q=${p.lat},${p.lon}(${encodeURIComponent(p.name)})`;
           resultsDiv.innerHTML += `
             <div class="card ${isFull ? "" : "partial"}">
               <span class="badge">${p.matchPercent}% Match â€¢ ${p.distanceKm} km away</span>
