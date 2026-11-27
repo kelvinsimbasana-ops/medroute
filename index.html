@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MedRoute â€” Kenya Pharmacy Stock Finder</title>
+  <title>MedRoute — Kenya Pharmacy Stock Finder</title>
+  <link rel="manifest" href="/manifest.json" />
   <style>
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 20px auto; padding: 0 16px; background: #f4f7f6; color: #222; }
     h1 { color: #0b6e4f; font-size: 1.5rem; margin-bottom: 4px; }
@@ -23,7 +24,6 @@
     .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; background: #e6f4ea; color: #0b6e4f; }
     .nav-btn { display: inline-block; margin-top: 8px; color: #0b6e4f; font-weight: bold; text-decoration: none; }
   </style>
-  <link rel="manifest" href="/manifest.json" />
 </head>
 <body>
   <h1>MedRoute Pharmacy Finder</h1>
@@ -39,11 +39,14 @@
 
   <div id="results"></div>
 
+  <p style="text-align:center; margin-top:24px;">
+    <a href="/admin" style="color:#0b6e4f; font-weight:bold; text-decoration:none;">Pharmacist & Branch Portal →</a>
+  </p>
+
   <script>
     let catalog = [];
     let selectedMeds = [];
 
-    // Load medicine dictionary on startup
     fetch("/api/catalog").then(r => r.json()).then(data => { catalog = data; });
 
     function showSuggestions() {
@@ -86,7 +89,7 @@
       document.getElementById("chips").innerHTML = selectedMeds.map(m => `
         <div class="chip">
           ${m.generic} ${m.rx ? '<span class="rx-tag">Rx</span>' : ''}
-          <span onclick="removeMedicine(${m.id})">Ã—</span>
+          <span onclick="removeMedicine(${m.id})">×</span>
         </div>
       `).join("");
     }
@@ -108,17 +111,23 @@
         const data = await res.json();
         status.textContent = `Found ${data.length} matching pharmacies.`;
 
+        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
         data.forEach(p => {
           const isFull = p.matchPercent === 100;
-          const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent); const placeQuery = encodeURIComponent(`${p.name}, ${p.area}`); const mapsUrl = isMobile ? `geo:${p.lat},${p.lon}?q=${p.lat},${p.lon}(${placeQuery})` : `https://google.com{placeQuery}&center=${p.lat},${p.lon}`;
+          const placeQuery = encodeURIComponent(`${p.name}, ${p.area}`);
+          const mapsUrl = isMobile
+            ? `geo:${p.lat},${p.lon}?q=${p.lat},${p.lon}(${placeQuery})`
+            : `https://google.com{p.lat},${p.lon}`;
+
           resultsDiv.innerHTML += `
             <div class="card ${isFull ? "" : "partial"}">
-              <span class="badge">${p.matchPercent}% Match â€¢ ${p.distanceKm} km away</span>
+              <span class="badge">${p.matchPercent}% Match • ${p.distanceKm} km away</span>
               <h3 style="margin:8px 0 4px;">${p.name}</h3>
               <div style="font-size:0.9rem; color:#555;">${p.area}</div>
               <p style="margin:8px 0 4px; font-size:0.9rem;"><strong>In Stock:</strong> ${p.available.join(", ")}</p>
               ${p.missing.length ? `<p style="margin:0; font-size:0.9rem; color:#b00020;"><strong>Missing:</strong> ${p.missing.join(", ")}</p>` : ""}
-              <a class="nav-btn" href="${mapsUrl}" >Navigate with Google Maps â†’</a>
+              <a class="nav-btn" href="${mapsUrl}" rel="noopener">Navigate with Google Maps →</a>
             </div>`;
         });
       };
@@ -126,14 +135,17 @@
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           pos => runQuery(pos.coords.latitude, pos.coords.longitude),
-          () => runQuery(-1.2648, 36.8047) // Fallback to Westlands, Nairobi
+          () => runQuery(-1.2648, 36.8047)
         );
       } else {
         runQuery(-1.2648, 36.8047);
       }
     }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
   </script>
-  <p style="text-align:center; margin-top:24px;"><a href="/admin" style="color:#0b6e4f; font-weight:bold; text-decoration:none;">Pharmacist & Branch Portal →</a></p>
-<script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js"); }</script></body>
+</body>
 </html>
 
