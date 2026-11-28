@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MedRoute — Pharmacist & Branch Portal</title>
-  <link rel="stylesheet" href="https://unpkg.com" />
-  <script src="https://unpkg.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 680px; margin: 20px auto; padding: 0 16px; background: #f4f7f6; color: #222; }
     h1 { color: #0b6e4f; font-size: 1.45rem; margin-bottom: 4px; }
@@ -21,7 +21,7 @@
     .cat { font-size: 0.78rem; color: #666; }
     .btn-main { width: 100%; padding: 12px; font-size: 1rem; font-weight: bold; background: #0b6e4f; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
     .msg { margin-top: 10px; font-weight: bold; font-size: 0.92rem; }
-    #mapPicker { height: 260px; width: 100%; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 10px; }
+    #mapPicker { height: 240px; width: 100%; border-radius: 10px; border: 1px solid #ccc; margin-bottom: 10px; }
     .pending-card { border: 1px solid #f0c36d; background: #fffdf5; padding: 10px; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; }
     .back { display: inline-block; margin-top: 12px; color: #0b6e4f; text-decoration: none; font-weight: bold; }
   </style>
@@ -29,10 +29,11 @@
 <body>
   <h1>Pharmacist & Branch Portal</h1>
 
-  <!-- 1. Update Existing Branch Stock -->
   <div class="box">
     <h3 style="margin-top:0; color:#0b6e4f;">1. Update Branch Stock</h3>
-    <select id="pharmacySelect" onchange="loadBranchStock()"></select>
+    <select id="pharmacySelect" onchange="loadBranchStock()">
+      <option value="">Loading pharmacies...</option>
+    </select>
     <input id="pinInput" type="password" placeholder="Enter Branch PIN (or Master Admin Code)" />
     <input id="filterInput" type="text" placeholder="Filter by medicine, brand, or category..." oninput="renderChecklist()" />
 
@@ -47,7 +48,6 @@
     <div id="statusMsg" class="msg"></div>
   </div>
 
-  <!-- 2. Interactive Map Pin & GPS Location Tool -->
   <div class="box">
     <h3 style="margin-top:0; color:#2b5876;">2. Tag Exact Pharmacy Location (Search Map or GPS)</h3>
     <div class="row-2">
@@ -56,7 +56,6 @@
     </div>
     <button type="button" class="btn-sm" style="width:100%; margin-bottom:10px;" onclick="captureGps()">📍 Use My Current GPS Location</button>
     <div id="mapPicker"></div>
-    <div style="font-size:0.82rem; color:#555; margin-bottom:8px;">Tip: Tap anywhere on the map or drag the blue pin to the exact pharmacy entrance.</div>
     <div class="row-2">
       <input id="pickedLat" type="text" placeholder="Latitude" />
       <input id="pickedLon" type="text" placeholder="Longitude" />
@@ -65,10 +64,8 @@
     <div id="pinMsg" class="msg"></div>
   </div>
 
-  <!-- 3. Register New Pharmacy Branch (Uses Pin Tagged Above) -->
   <div class="box">
     <h3 style="margin-top:0; color:#3a5a40;">3. Register a New Pharmacy Branch</h3>
-    <p style="font-size:0.85rem; color:#555; margin-top:0;">Tag the pharmacy's exact spot on the map in Section #2 above, then fill details below:</p>
     <input id="regName" type="text" placeholder="Pharmacy Name (e.g. Goodlife Sarit Centre)" />
     <input id="regArea" type="text" placeholder="Area / Highway (e.g. Westlands - Karuna Rd)" />
     <input id="regPhone" type="text" placeholder="Branch Phone / WhatsApp (e.g. 0712345678)" />
@@ -78,11 +75,10 @@
     <div id="regMsg" class="msg"></div>
   </div>
 
-  <!-- 4. Add Missing Medicine / Category -->
   <div class="box">
     <h3 style="margin-top:0; color:#1b4965;">4. Add Missing Medicine or Category</h3>
-    <input id="newGeneric" type="text" placeholder="Generic name (e.g. timolol eye drops)" />
-    <input id="newBrands" type="text" placeholder="Brand names separated by | (e.g. timoptol|nyolol)" />
+    <input id="newGeneric" type="text" placeholder="Generic name (e.g. insulin detemir)" />
+    <input id="newBrands" type="text" placeholder="Brand names separated by | (e.g. levemir|levemir flexpen)" />
     <input id="newCategory" list="categorySuggestions" type="text" placeholder="Category (pick existing or type a new one)" />
     <datalist id="categorySuggestions"></datalist>
     <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; margin-bottom:8px;">
@@ -92,7 +88,6 @@
     <div id="addMsg" class="msg"></div>
   </div>
 
-  <!-- 5. Master Admin Approval Queue -->
   <div class="box" id="approvalBox" style="display:none;">
     <h3 style="margin-top:0; color:#b00020;">5. Pending Branch Approvals (Master Admin)</h3>
     <input id="masterKeyInput" type="password" placeholder="Enter Master Admin Code (MEDROUTE2026)" />
@@ -107,26 +102,24 @@
     let pharmacies = [];
     let currentStockSet = new Set();
     let showOnlyChecked = false;
-    let map, marker;
+    let map = null, marker = null;
 
     function initMap() {
-      map = L.map("mapPicker").setView([-1.2648, 36.8047], 14);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap"
-      }).addTo(map);
-
-      marker = L.marker([-1.2648, 36.8047], { draggable: true }).addTo(map);
+      try {
+        if (typeof L === "undefined") return;
+        map = L.map("mapPicker").setView([-1.2648, 36.8047], 14);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+        marker = L.marker([-1.2648, 36.8047], { draggable: true }).addTo(map);
+        marker.on("dragend", () => {
+          const pos = marker.getLatLng();
+          setPickedCoords(pos.lat, pos.lng);
+        });
+        map.on("click", e => {
+          marker.setLatLng(e.latlng);
+          setPickedCoords(e.latlng.lat, e.latlng.lng);
+        });
+      } catch (e) {}
       setPickedCoords(-1.2648, 36.8047);
-
-      marker.on("dragend", () => {
-        const pos = marker.getLatLng();
-        setPickedCoords(pos.lat, pos.lng);
-      });
-
-      map.on("click", e => {
-        marker.setLatLng(e.latlng);
-        setPickedCoords(e.latlng.lat, e.latlng.lng);
-      });
     }
 
     function setPickedCoords(lat, lon) {
@@ -135,9 +128,11 @@
     }
 
     function movePin(lat, lon, zoom = 17) {
-      marker.setLatLng([lat, lon]);
-      map.setView([lat, lon], zoom);
       setPickedCoords(lat, lon);
+      if (map && marker) {
+        marker.setLatLng([lat, lon]);
+        map.setView([lat, lon], zoom);
+      }
     }
 
     async function searchMapPlace() {
@@ -146,32 +141,148 @@
       if (!q) return;
       pinMsg.style.color = "#555";
       pinMsg.textContent = "Searching map...";
-      const res = await fetch(`https://openstreetmap.org{encodeURIComponent(q)}`);
-      const places = await res.json();
-      if (!places.length) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ", Kenya")}`);
+        const places = await res.json();
+        if (!places.length) {
+          pinMsg.style.color = "#b00020";
+          pinMsg.textContent = "Place not found. Try a nearby landmark or street name.";
+          return;
+        }
+        movePin(places[0].lat, places[0].lon, 17);
+        pinMsg.style.color = "#0b6e4f";
+        pinMsg.textContent = `Found: ${places[0].display_name.split(",").slice(0, 3).join(",")}`;
+      } catch (e) {
         pinMsg.style.color = "#b00020";
-        pinMsg.textContent = "Place not found. Try a nearby landmark or street name, then drag the pin.";
-        return;
+        pinMsg.textContent = "Map search unavailable. Drag the pin manually.";
       }
-      movePin(places[0].lat, places[0].lon, 17);
-      pinMsg.style.color = "#0b6e4f";
-      pinMsg.textContent = `Found: ${places[0].display_name.split(",").slice(0, 3).join(",")}. Drag pin if needed!`;
     }
 
     function captureGps() {
       const pinMsg = document.getElementById("pinMsg");
-      if (!navigator.geolocation) { pinMsg.textContent = "GPS not supported."; return; }
+      if (!navigator.geolocation) {
+        pinMsg.style.color = "#b00020";
+        pinMsg.textContent = "GPS not supported on this device.";
+        return;
+      }
       pinMsg.style.color = "#555";
-      pinMsg.textContent = "Capturing exact GPS location...";
+      pinMsg.textContent = "Getting GPS location...";
       navigator.geolocation.getCurrentPosition(
         pos => {
           movePin(pos.coords.latitude, pos.coords.longitude, 18);
           pinMsg.style.color = "#0b6e4f";
-          pinMsg.textContent = "Exact GPS location tagged on map!";
+          pinMsg.textContent = "GPS location captured!";
         },
-        () => { pinMsg.style.color = "#b00020"; pinMsg.textContent = "Location permission denied."; },
-        { enableHighAccuracy: true }
+        () => {
+          pinMsg.style.color = "#b00020";
+          pinMsg.textContent = "Could not get GPS. Please allow location access.";
+        }
       );
+    }
+
+    async function loadData() {
+      try {
+        const [catRes, pharmRes] = await Promise.all([
+          fetch("/api/catalog"),
+          fetch("/api/pharmacies")
+        ]);
+        catalog = await catRes.json();
+        pharmacies = await pharmRes.json();
+
+        const cats = [...new Set(catalog.map(m => m.category))].sort();
+        document.getElementById("categorySuggestions").innerHTML = cats.map(c => `<option value="${c}">`).join("");
+
+        const select = document.getElementById("pharmacySelect");
+        if (!pharmacies.length) {
+          select.innerHTML = `<option value="">No pharmacies found in CSV</option>`;
+        } else {
+          select.innerHTML = pharmacies.map(p =>
+            `<option value="${p.index}">${p.name} — ${p.area}${p.approved ? "" : " [PENDING]"}</option>`
+          ).join("");
+          loadBranchStock();
+        }
+        renderPending();
+      } catch (e) {
+        document.getElementById("pharmacySelect").innerHTML = `<option value="">Error loading pharmacies</option>`;
+      }
+    }
+
+    function loadBranchStock() {
+      const idx = parseInt(document.getElementById("pharmacySelect").value, 10);
+      const p = pharmacies.find(x => x.index === idx);
+      if (!p) return;
+      currentStockSet = new Set(p.stockIds || []);
+      movePin(p.lat, p.lon, 16);
+      renderChecklist();
+    }
+
+    function updateStockCount() {
+      document.getElementById("stockCount").textContent = currentStockSet.size;
+    }
+
+    function toggleMed(id, checked) {
+      if (checked) currentStockSet.add(id);
+      else currentStockSet.delete(id);
+      updateStockCount();
+    }
+
+    function getFilteredCatalog() {
+      const q = document.getElementById("filterInput").value.trim().toLowerCase();
+      return catalog.filter(m => {
+        if (showOnlyChecked && !currentStockSet.has(m.id)) return false;
+        if (!q) return true;
+        return m.generic.includes(q) || m.category.toLowerCase().includes(q) || m.brands.some(b => b.includes(q));
+      });
+    }
+
+    function renderChecklist() {
+      updateStockCount();
+      const list = getFilteredCatalog();
+      document.getElementById("medList").innerHTML = list.map(m => `
+        <div class="med-row">
+          <input type="checkbox" id="med_${m.id}" ${currentStockSet.has(m.id) ? "checked" : ""} onchange="toggleMed(${m.id}, this.checked)" />
+          <label for="med_${m.id}">
+            <strong>${m.generic}</strong> (${m.brands.join(", ")})
+            <div class="cat">${m.category} ${m.rx ? "• Rx" : ""}</div>
+          </label>
+        </div>
+      `).join("");
+    }
+
+    function selectAllVisible() {
+      getFilteredCatalog().forEach(m => currentStockSet.add(m.id));
+      renderChecklist();
+    }
+
+    function clearAllVisible() {
+      getFilteredCatalog().forEach(m => currentStockSet.delete(m.id));
+      renderChecklist();
+    }
+
+    function toggleOnlyStocked() {
+      showOnlyChecked = !showOnlyChecked;
+      document.getElementById("onlyStockedBtn").style.background = showOnlyChecked ? "#0b6e4f" : "#e6f4ea";
+      document.getElementById("onlyStockedBtn").style.color = showOnlyChecked ? "#fff" : "#0b6e4f";
+      renderChecklist();
+    }
+
+    async function saveStock() {
+      const idx = document.getElementById("pharmacySelect").value;
+      const pin = document.getElementById("pinInput").value.trim();
+      const msg = document.getElementById("statusMsg");
+      const body = new URLSearchParams({
+        index: idx,
+        pin: pin,
+        ids: [...currentStockSet].join(",")
+      });
+      const res = await fetch("/api/update_stock", { method: "POST", body });
+      const data = await res.json();
+      msg.style.color = data.ok ? "#0b6e4f" : "#b00020";
+      msg.textContent = data.msg;
+      if (data.ok) {
+        const p = pharmacies.find(x => x.index === parseInt(idx, 10));
+        if (p) p.stockIds = [...currentStockSet];
+      }
     }
 
     async function updateExistingBranchPin() {
@@ -179,10 +290,83 @@
       const pin = document.getElementById("pinInput").value.trim();
       const lat = document.getElementById("pickedLat").value.trim();
       const lon = document.getElementById("pickedLon").value.trim();
-      const pinMsg = document.getElementById("pinMsg");
-      if (!pin || !lat || !lon) {
-        pinMsg.style.color = "#b00020";
-        pinMsg.textContent = "Enter your Branch PIN (or Master Code) in Section #1 and tag a spot on the map.";
-        return;
-      }
+      const msg = document.getElementById("pinMsg");
+      const body = new URLSearchParams({ index: idx, pin, lat, lon });
+      const res = await fetch("/api/update_location", { method: "POST", body });
+      const data = await res.json();
+      msg.style.color = data.ok ? "#0b6e4f" : "#b00020";
+      msg.textContent = data.msg;
+    }
 
+    async function registerPharmacy() {
+      const msg = document.getElementById("regMsg");
+      const body = new URLSearchParams({
+        name: document.getElementById("regName").value.trim(),
+        area: document.getElementById("regArea").value.trim(),
+        phone: document.getElementById("regPhone").value.trim(),
+        ppb: document.getElementById("regPpb").value.trim(),
+        pin: document.getElementById("regPin").value.trim(),
+        lat: document.getElementById("pickedLat").value.trim(),
+        lon: document.getElementById("pickedLon").value.trim()
+      });
+      const res = await fetch("/api/register_pharmacy", { method: "POST", body });
+      const data = await res.json();
+      msg.style.color = data.ok ? "#0b6e4f" : "#b00020";
+      msg.textContent = data.msg;
+      if (data.ok) loadData();
+    }
+
+    async function addNewMedicine() {
+      const msg = document.getElementById("addMsg");
+      const body = new URLSearchParams({
+        index: document.getElementById("pharmacySelect").value,
+        pin: document.getElementById("pinInput").value.trim(),
+        generic: document.getElementById("newGeneric").value.trim(),
+        brands: document.getElementById("newBrands").value.trim(),
+        category: document.getElementById("newCategory").value.trim(),
+        rx: document.getElementById("newRx").checked ? "1" : "0"
+      });
+      const res = await fetch("/api/add_medicine", { method: "POST", body });
+      const data = await res.json();
+      msg.style.color = data.ok ? "#0b6e4f" : "#b00020";
+      msg.textContent = data.msg;
+      if (data.ok) {
+        document.getElementById("newGeneric").value = "";
+        document.getElementById("newBrands").value = "";
+        loadData();
+      }
+    }
+
+    function renderPending() {
+      const pending = pharmacies.filter(p => !p.approved);
+      const box = document.getElementById("approvalBox");
+      if (!pending.length) { box.style.display = "none"; return; }
+      box.style.display = "block";
+      document.getElementById("pendingList").innerHTML = pending.map(p => `
+        <div class="pending-card">
+          <strong>${p.name}</strong> (${p.area})<br/>
+          PPB: ${p.ppb} • Phone: ${p.phone}
+          <div class="toolbar" style="margin-top:8px; margin-bottom:0;">
+            <button class="btn-sm" onclick="verifyBranch(${p.index}, 'approve')">Approve</button>
+            <button class="btn-sm clear" onclick="verifyBranch(${p.index}, 'reject')">Reject</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function verifyBranch(index, action) {
+      const master = document.getElementById("masterKeyInput").value.trim();
+      const msg = document.getElementById("verifyMsg");
+      const body = new URLSearchParams({ master, index, action });
+      const res = await fetch("/api/verify_pharmacy", { method: "POST", body });
+      const data = await res.json();
+      msg.style.color = data.ok ? "#0b6e4f" : "#b00020";
+      msg.textContent = data.msg;
+      if (data.ok) loadData();
+    }
+
+    initMap();
+    loadData();
+  </script>
+</body>
+</html>

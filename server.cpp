@@ -1,4 +1,4 @@
-﻿#include "httplib.h"
+#include "httplib.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -80,15 +80,15 @@ void syncFileToGitHub(const std::string& filename) {
     if (token.empty() || repo.empty()) return;
 
     std::thread([filename, token, repo]() {
+        std::string apiUrl = "https://api.github.com/repos/" + repo + "/contents/" + filename;
         std::string cmd =
-            "SHA=$(curl -s -H \"Authorization: Bearer " + token + "\" "
-            "\"https://github.com" + repo + "/contents/" + filename + "\" | "
+            "SHA=$(curl -s -H \"Authorization: Bearer " + token + "\" \"" + apiUrl + "\" | "
             "grep -m1 '\"sha\"' | cut -d'\"' -f4); "
             "B64=$(base64 -w 0 " + filename + "); "
             "curl -s -X PUT -H \"Authorization: Bearer " + token + "\" "
             "-H \"Content-Type: application/json\" "
             "-d \"{\\\"message\\\":\\\"Auto-sync " + filename + "\\\",\\\"content\\\":\\\"$B64\\\",\\\"sha\\\":\\\"$SHA\\\"}\" "
-            "\"https://github.com" + repo + "/contents/" + filename + "\" > /dev/null 2>&1";
+            "\"" + apiUrl + "\" > /dev/null 2>&1";
         std::system(cmd.c_str());
     }).detach();
 }
@@ -416,7 +416,6 @@ int main() {
 
     svr.Post("/api/update_stock", [&](const httplib::Request& req, httplib::Response& res) {
         size_t idx = std::stoul(req.get_param_value("index"));
-
         std::string pin = trim(req.get_param_value("pin"));
         std::string idsParam = req.has_param("ids") ? req.get_param_value("ids") : "";
 
@@ -520,4 +519,3 @@ int main() {
     svr.listen("0.0.0.0", port);
     return 0;
 }
-
